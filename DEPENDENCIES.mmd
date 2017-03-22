@@ -1,0 +1,25 @@
+graph TD
+  git-->ENV{ENV}
+  git-->log
+  s3-->ENV{ENV}
+  s3-->log
+  cloudPages((cloudPages))-->ENV{ENV}
+  cloudPages((cloudPages))-->glob
+  cloudPages((cloudPages))-->fs
+  cloudPages((cloudPages))-->log
+  cloudPages((cloudPages))-->s3
+  cloudPages((cloudPages))-->mime
+  cloudPages((cloudPages))-->git
+  cloudPages((cloudPages))-->time
+  classDef cloudPages fill:#e7cdd2,stroke:#ebd4cb,stroke-width:1px;
+  classDef config fill:#d4cdcc,stroke:#ebd4cb,stroke-width:1px;
+  classDef others fill:#ebd4cb,stroke:#000,stroke-width:1px;
+  class ENV config;
+  class git others;
+  class log others;
+  class s3 others;
+  class cloudPages cloudPages;
+  class glob others;
+  class fs others;
+  class mime others;
+  class time others;
