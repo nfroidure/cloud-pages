@@ -12,7 +12,7 @@
 The `cloudPages` service allows to deploy a new frontend version
  to the cloud by managing the number of prior versions to keep
  so that you won't have to manually check which version to keep
- and waste resources by forgotting to remove them.
+ and waste resources by forgoting to remove them.
 
 This service needs some other services. To be able to mock and
  interchange them, we use
