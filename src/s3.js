@@ -18,12 +18,12 @@ function initS3Service(
 }
 
 function s3Service({ ENV, log }) {
-  return Promise.resolve()
-  .then(() => {
+  return Promise.resolve().then(() => {
     const s3 = new AWSS3({
       region: ENV.AWS_S3_REGION || ENV.AWS_REGION,
       accessKeyId: ENV.AWS_S3_ACCESS_KEY_ID || ENV.AWS_ACCESS_KEY_ID,
-      secretAccessKey: ENV.AWS_S3_SECRET_ACCESS_KEY || ENV.AWS_SECRET_ACCESS_KEY,
+      secretAccessKey:
+        ENV.AWS_S3_SECRET_ACCESS_KEY || ENV.AWS_SECRET_ACCESS_KEY,
       logger: { log: debug },
     });
 
@@ -33,7 +33,7 @@ function s3Service({ ENV, log }) {
       listObjectsAsync: (...args) =>
         new Promise((resolve, reject) => {
           s3.listObjectsV2(...args, (err, data) => {
-            if(err) {
+            if (err) {
               reject(err);
               return;
             }
@@ -43,7 +43,7 @@ function s3Service({ ENV, log }) {
       deleteObjectsAsync: (...args) =>
         new Promise((resolve, reject) => {
           s3.deleteObjects(...args, (err, data) => {
-            if(err) {
+            if (err) {
               reject(err);
               return;
             }
@@ -53,7 +53,7 @@ function s3Service({ ENV, log }) {
       createBucketAsync: (...args) =>
         new Promise((resolve, reject) => {
           s3.createBucket(...args, (err, data) => {
-            if(err) {
+            if (err) {
               reject(err);
               return;
             }
@@ -63,7 +63,7 @@ function s3Service({ ENV, log }) {
       putObjectAsync: (...args) =>
         new Promise((resolve, reject) => {
           s3.putObject(...args, (err, data) => {
-            if(err) {
+            if (err) {
               reject(err);
               return;
             }
@@ -73,7 +73,7 @@ function s3Service({ ENV, log }) {
       putBucketAclAsync: (...args) =>
         new Promise((resolve, reject) => {
           s3.putBucketAcl(...args, (err, data) => {
-            if(err) {
+            if (err) {
               reject(err);
               return;
             }
@@ -83,7 +83,7 @@ function s3Service({ ENV, log }) {
       putBucketWebsiteAsync: (...args) =>
         new Promise((resolve, reject) => {
           s3.putBucketWebsite(...args, (err, data) => {
-            if(err) {
+            if (err) {
               reject(err);
               return;
             }

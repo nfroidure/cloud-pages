@@ -52,9 +52,10 @@ function initCloudPages(
   name = 'cloudPages',
   dependencies = ['ENV', 'glob', 'fs', 'log', 's3', 'mime', 'git', 'time']
 ) {
-  $.service(name,
-    $.depends(dependencies,
-      services => Promise.resolve(cloudPages.bind(null, services))
+  $.service(
+    name,
+    $.depends(dependencies, services =>
+      Promise.resolve(cloudPages.bind(null, services))
     )
   );
 }
@@ -82,175 +83,199 @@ function initCloudPages(
  * @param {String}   options.bucket  Targetted bucket
  * @return {Promise}                 A promise to be resolved when the deployment ended
  */
-function cloudPages({
-  ENV, glob, fs, log, s3, mime, git, time,
-}, {
-  delay = DEFAULT_DELAY,
-  last = DEFAULT_LAST,
-  dir,
-  gitDir,
-  files = '**/*',
-  ignore = '.git/**/*',
-  version,
-  remove = false,
-  bucket,
-} = {}) {
+function cloudPages(
+  { ENV, glob, fs, log, s3, mime, git, time },
+  {
+    delay = DEFAULT_DELAY,
+    last = DEFAULT_LAST,
+    dir,
+    gitDir,
+    files = '**/*',
+    ignore = '.git/**/*',
+    version,
+    remove = false,
+    bucket,
+  } = {}
+) {
   return Promise.resolve()
-  .then(() => {
-    if('string' !== typeof version) {
-      throw new YError('E_VERSION_REQUIRED', typeof version, version);
-    }
-    if('string' !== typeof dir) {
-      throw new YError('E_DIR_REQUIRED', typeof dir, dir);
-    }
-    bucket = bucket || ENV.AWS_S3_BUCKET;
-    if('string' !== typeof bucket) {
-      throw new YError('E_BUCKET_REQUIRED', typeof bucket, bucket);
-    }
-  })
-  .then(() => {
-    const pattern = path.join(dir, files);
-
-    gitDir = gitDir || dir;
-
-    log('info', 'Deploying ' + version);
-
-    return glob(pattern, {
-      dir,
-      ignore: path.join(dir, ignore),
-      dot: true,
-      nodir: true,
-      absolute: true,
-    })
-    .catch((err) => {
-      log('error', 'Directory scan failure:', pattern);
-      log('stack', 'Stack:', err.stack);
-      throw YError.wrap(err, 'E_SCAN_FAILURE', pattern);
-    })
-    .then((files) => {
-      log('debug', 'Succesfully scanned files', pattern);
-      log('debug', 'Files:', files);
-      if(0 === files.length) {
-        throw new YError('E_NO_FILES', pattern);
+    .then(() => {
+      if ('string' !== typeof version) {
+        throw new YError('E_VERSION_REQUIRED', typeof version, version);
       }
-      return files;
-    });
-  })
-  .then(files => Promise.resolve(files.map(
-    (file) => {
-      const key = path.join(version, path.relative(dir, file));
+      if ('string' !== typeof dir) {
+        throw new YError('E_DIR_REQUIRED', typeof dir, dir);
+      }
+      bucket = bucket || ENV.AWS_S3_BUCKET;
+      if ('string' !== typeof bucket) {
+        throw new YError('E_BUCKET_REQUIRED', typeof bucket, bucket);
+      }
+    })
+    .then(() => {
+      const pattern = path.join(dir, files);
 
-      return Promise.resolve()
-      .then(() => {
+      gitDir = gitDir || dir;
 
-        log('debug', 'Sending file:', file, key);
-        return s3.putObjectAsync({
+      log('info', 'Deploying ' + version);
+
+      return glob(pattern, {
+        dir,
+        ignore: path.join(dir, ignore),
+        dot: true,
+        nodir: true,
+        absolute: true,
+      })
+        .catch(err => {
+          log('error', 'Directory scan failure:', pattern);
+          log('stack', 'Stack:', err.stack);
+          throw YError.wrap(err, 'E_SCAN_FAILURE', pattern);
+        })
+        .then(files => {
+          log('debug', 'Succesfully scanned files', pattern);
+          log('debug', 'Files:', files);
+          if (0 === files.length) {
+            throw new YError('E_NO_FILES', pattern);
+          }
+          return files;
+        });
+    })
+    .then(files =>
+      Promise.resolve(
+        files.map(file => {
+          const key = path.join(version, path.relative(dir, file));
+
+          return Promise.resolve()
+            .then(() => {
+              log('debug', 'Sending file:', file, key);
+              return s3
+                .putObjectAsync({
+                  Bucket: bucket,
+                  ACL: 'public-read',
+                  Key: key,
+                  Body: fs.createReadStream(file),
+                  ContentType: mime.lookup(file),
+                })
+                .then(() => {
+                  log('debug', 'File sent:', file, key);
+                });
+            })
+            .catch(err => {
+              throw YError.wrap(err, 'E_S3_UPLOAD_ERROR', file, key);
+            });
+        })
+      )
+    )
+    .then(() => {
+      log('debug', 'Setting up the bucket ACLs.');
+      return s3
+        .putBucketAclAsync({
           Bucket: bucket,
           ACL: 'public-read',
-          Key: key,
-          Body: fs.createReadStream(file),
-          ContentType: mime.lookup(file),
         })
         .then(() => {
-          log('debug', 'File sent:', file, key);
+          log('debug', 'Bucket ACLs set.');
         });
-      })
-      .catch((err) => {
-        throw YError.wrap(err, 'E_S3_UPLOAD_ERROR', file, key);
-      });
-    }
-  )))
-  .then(() => {
-    log('debug', 'Setting up the bucket ACLs.');
-    return s3.putBucketAclAsync({
-      Bucket: bucket,
-      ACL: 'public-read',
     })
     .then(() => {
-      log('debug', 'Bucket ACLs set.');
-    });
-  })
-  .then(() => {
-    log('debug', 'Setting up the website rules.');
-    return s3.putBucketWebsiteAsync({
-      Bucket: bucket,
-      WebsiteConfiguration: {
-        ErrorDocument: {
-          Key: version + '/index.html',
-        },
-        IndexDocument: {
-          Suffix: 'index.html',
-        },
-        // Always redirect to the current version
-        RoutingRules: [{
-          Redirect: {
-            ReplaceKeyWith: version + '/index.html',
+      log('debug', 'Setting up the website rules.');
+      return s3
+        .putBucketWebsiteAsync({
+          Bucket: bucket,
+          WebsiteConfiguration: {
+            ErrorDocument: {
+              Key: version + '/index.html',
+            },
+            IndexDocument: {
+              Suffix: 'index.html',
+            },
+            // Always redirect to the current version
+            RoutingRules: [
+              {
+                Redirect: {
+                  ReplaceKeyWith: version + '/index.html',
+                },
+                Condition: {
+                  KeyPrefixEquals: '/index.html',
+                },
+              },
+            ],
           },
-          Condition: {
-            KeyPrefixEquals: '/index.html',
-          },
-        }],
-      },
+        })
+        .then(() => {
+          log('debug', 'Website rules set.');
+        });
     })
     .then(() => {
-      log('debug', 'Website rules set.');
-    });
-  })
-  .then(() => {
-    log('info', 'Successfully deployed ' + version);
+      log('info', 'Successfully deployed ' + version);
 
-    if(!remove) {
-      return Promise.resolve();
-    }
+      if (!remove) {
+        return Promise.resolve();
+      }
 
-    log('info', 'Seeking for old versions to remove.');
-    const now = time();
-    return git.getCommits(gitDir)
-    .then((commits) => {
-      const versionsToRemove = commits.filter((commit, i) => {
-        if(
-          version !== commit.tag &&
-          i + 1 > last &&
-          commit.time < now - delay
-        ) {
-          return true;
-        }
-        return false;
+      log('info', 'Seeking for old versions to remove.');
+      const now = time();
+      return git.getCommits(gitDir).then(commits => {
+        const versionsToRemove = commits.filter((commit, i) => {
+          if (
+            version !== commit.tag &&
+            i + 1 > last &&
+            commit.time < now - delay
+          ) {
+            return true;
+          }
+          return false;
+        });
+
+        log(
+          'debug',
+          'Found ' +
+            versionsToRemove.length +
+            ' versions to potentially remove.'
+        );
+
+        return Promise.all(
+          versionsToRemove.map(
+            _recursivelyDeleteVersionObjects.bind(
+              null,
+              { ENV, log, s3 },
+              bucket
+            )
+          )
+        );
       });
-
-      log('debug', 'Found ' + versionsToRemove.length + ' versions to potentially remove.');
-
-      return Promise.all(
-        versionsToRemove.map(_recursivelyDeleteVersionObjects.bind(null, { ENV, log, s3 }, bucket))
-      );
     });
-  });
 }
 
-function _recursivelyDeleteVersionObjects({ log, s3 }, bucket, commit, changed = false) {
+function _recursivelyDeleteVersionObjects({ log, s3 }, bucket, commit) {
   log('debug', 'Listing objects for version "' + commit.tag + '"');
-  return s3.listObjectsAsync({
-    Bucket: bucket,
-    Prefix: commit.tag + '/',
-  })
-  .then((objects) => {
-    if(!objects.Contents.length) {
-      log('info', 'No objects found for version "' + commit.tag + '"');
-      return Promise.resolve();
-    }
-    log('info', 'Removing objects for version "' + commit.tag + '"');
-    log('debug', 'Files ', objects);
-    return s3.deleteObjectsAsync({
+  return s3
+    .listObjectsAsync({
       Bucket: bucket,
-      Delete: {
-        Objects: objects.Contents.map(({ Key }) => ({ Key })),
-      },
+      Prefix: commit.tag + '/',
     })
-    .then(() => {
-      if(objects.MaxKeys === objects.KeyCount) {
-        return _recursivelyDeleteVersionObjects({ log, s3 }, bucket, commit, true);
+    .then(objects => {
+      if (!objects.Contents.length) {
+        log('info', 'No objects found for version "' + commit.tag + '"');
+        return Promise.resolve();
       }
-      return Promise.resolve();
+      log('info', 'Removing objects for version "' + commit.tag + '"');
+      log('debug', 'Files ', objects);
+      return s3
+        .deleteObjectsAsync({
+          Bucket: bucket,
+          Delete: {
+            Objects: objects.Contents.map(({ Key }) => ({ Key })),
+          },
+        })
+        .then(() => {
+          if (objects.MaxKeys === objects.KeyCount) {
+            return _recursivelyDeleteVersionObjects(
+              { log, s3 },
+              bucket,
+              commit,
+              true
+            );
+          }
+          return Promise.resolve();
+        });
     });
-  });
 }
