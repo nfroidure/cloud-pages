@@ -1,6 +1,6 @@
 {
   "name": "cloud-pages",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Push your pages to cloud buckets (S3 for now).",
   "main": "src/cloudpages.js",
   "metapak": {
